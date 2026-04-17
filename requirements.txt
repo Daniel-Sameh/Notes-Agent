@@ -1,0 +1,13 @@
+langgraph>=0.2
+langchain>=0.3
+langchain-groq>=0.2
+langchain-core>=0.3
+langchain_ollama
+pydantic>=2.0
+python-dotenv
+rich
+sentence-transformers
+numpy
+chromadb>=0.5.0
+sqlalchemy>=2.0.0
+langmem>=0.0.1
