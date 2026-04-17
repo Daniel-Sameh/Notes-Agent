@@ -74,3 +74,5 @@ def delete_note(id: int) -> bool:
     if not success:
          raise ValueError(f"Note with ID '{id}' not found.")
     return success
+
+tools = [add_note, get_note, get_note_by_id, search_notes, update_note, delete_note]

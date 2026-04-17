@@ -2,7 +2,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
 from typing import Generator, Optional, List
-from .models import Base, Note
+from .models import Base, Note, User
 from .utils import utc_now
 from ..config import settings
 
@@ -21,50 +21,97 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 # Notes CRUD Operations
-def create_note(title: str, body: str, tags: Optional[List[str]]) -> Note:
+def create_note(user_id: str, title: str, body: str, tags: Optional[List[str]]) -> Note:
     with SessionLocal() as db:
-        note = Note(title=title, body=body, tags=",".join(tags) if tags else "")
+        note = Note(user_id=user_id, title=title, body=body, tags=",".join(tags) if tags else "")
         db.add(note)
         db.commit()
         db.refresh(note)
         return note
 
-def get_note_by_id(id: str) -> Optional[Note]:
+def get_note_by_id(user_id: str, id: str) -> Optional[Note]:
     with SessionLocal() as db:
-        return db.query(Note).filter(Note.id == id).first()
+        return db.query(Note).filter(Note.id == id, Note.user_id == user_id).first()
 
-def search_notes(query: str = "", tags: Optional[List[str]] = None, date: Optional[datetime] = None, date_end: Optional[datetime] = None, limit: int = 10) -> List[Note]:
+def search_notes(user_id: str, query: str = "", tags: Optional[List[str]] = None, date: Optional[datetime] = None, date_end: Optional[datetime] = None, limit: int = 10) -> List[Note]:
     with SessionLocal() as db:
+        base_query = db.query(Note).filter(Note.user_id == user_id)
         notes = set()
+        
         if query:
-            notes.update(db.query(Note).filter(Note.body.contains(query)).all())
+            notes.update(base_query.filter(Note.body.contains(query)).all())
         if tags:
-            notes.update(db.query(Note).filter(Note.tags.contains(",".join(tags))).all())
+            notes.update(base_query.filter(Note.tags.contains(",".join(tags))).all())
+        
+        # Date filtering
         if date and date_end:
-            notes.update(db.query(Note).filter(Note.created_at >= date, Note.created_at < date_end).all())
+            notes.update(base_query.filter(Note.created_at >= date, Note.created_at < date_end).all())
         elif date:
-            notes.update(db.query(Note).filter(Note.created_at >= date).all())
+            notes.update(base_query.filter(Note.created_at >= date).all())
         elif date_end:
-            notes.update(db.query(Note).filter(Note.created_at < date_end).all())
+            notes.update(base_query.filter(Note.created_at < date_end).all())
+            
+        # If no filters were provided, just return the latest notes for the user
+        if not (query or tags or date or date_end):
+            notes.update(base_query.all())
+            
         return list(notes)[:limit]
 
-def update_note(id: str, title: Optional[str], body: Optional[str], tags: Optional[List[str]]) -> Optional[Note]:
+def update_note(user_id: str, id: str, title: Optional[str], body: Optional[str], tags: Optional[List[str]]) -> Optional[Note]:
     with SessionLocal() as db:
-        note = db.query(Note).filter(Note.id == id).first()
+        note = db.query(Note).filter(Note.id == id, Note.user_id == user_id).first()
         if note:
-            note.title = title if title else note.title
-            note.body = body if body else note.body
-            note.tags = ", ".join(tags) if tags else ""
+            if title is not None:
+                note.title = title
+            if body is not None:
+                note.body = body
+            if tags is not None:
+                note.tags = ",".join(tags)
             note.updated_at = utc_now()
             db.commit()
             db.refresh(note)
         return note
 
-def delete_note(id: str) -> bool:
+def delete_note(user_id: str, id: str) -> bool:
     with SessionLocal() as db:
-        note = db.query(Note).filter(Note.id == id).first()
+        note = db.query(Note).filter(Note.id == id, Note.user_id == user_id).first()
         if note:
             db.delete(note)
+            db.commit()
+            return True
+        return False
+
+# Users CRUD Operations
+def create_user(username: str) -> User:
+    with SessionLocal() as db:
+        user = User(username=username)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+def get_user_by_username(username: str) -> Optional[User]:
+    with SessionLocal() as db:
+        return db.query(User).filter(User.username == username).first()
+    
+def get_user_by_id(id: str) -> Optional[User]:
+    with SessionLocal() as db:
+        return db.query(User).filter(User.id == id).first()
+
+def update_user(id: str, username: str) -> Optional[User]:
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.id == id).first()
+        if user:
+            user.username = username
+            db.commit()
+            db.refresh(user)
+        return user
+
+def delete_user(id: str) -> bool:
+    with SessionLocal() as db:
+        user = db.query(User).filter(User.id == id).first()
+        if user:
+            db.delete(user)
             db.commit()
             return True
         return False

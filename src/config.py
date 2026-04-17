@@ -6,6 +6,7 @@ class Settings:
         load_dotenv()
         self.groq_api = os.getenv("GROQ_API_KEY")
         self.db_url = os.getenv("DATABASE_URL", "sqlite:///./notes.db")
+        self.chroma_url = os.getenv("CHROMADB_URL", "./chroma_data")
         self.llm_provider = os.getenv("LLM_PROVIDER", "groq")
     
     def get_llm_api_key(self):
