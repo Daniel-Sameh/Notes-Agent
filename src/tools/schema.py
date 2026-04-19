@@ -3,12 +3,12 @@ from datetime import datetime
 
 
 class Note(TypedDict):
-    id: int
+    id: str
     title: str
     body: str
     tags: List[str]
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[str]
+    updated_at: Optional[str]
 
 class AddNoteInput(TypedDict):
     title: str
@@ -22,8 +22,8 @@ class GetNoteInput(TypedDict):
 class SearchNoteInput(TypedDict):
     query: str
     tags: Optional[List[str]] = None
-    date: Optional[datetime] = None
-    date_end: Optional[datetime] = None
+    date: Optional[str] = None
+    date_end: Optional[str] = None
     limit: Optional[int] = 10
 
 class UpdateNoteInput(TypedDict):

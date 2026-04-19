@@ -16,7 +16,7 @@ class AgentState(TypedDict):
     
     # To handle intent disambiguation and object reference
     # I keep track of the most recently discussed note IDs
-    active_note_ids: List[int]
+    active_note_ids: List[str]
     
     error: Optional[str]
     

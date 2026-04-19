@@ -1,6 +1,8 @@
 from ..config import settings
 from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models.chat_models import BaseChatModel
 
 class LLMProvider:
@@ -33,17 +35,38 @@ class LLMProvider:
                 raise ValueError("Groq API key is missing. Please set GROQ_API_KEY in your .env file.")
             
             self._client = ChatGroq(
-                model="llama3-70b-8192",  # Consider moving this to settings in the future
+                model="llama-3.1-8b-instant",
                 temperature=0,
                 api_key=api_key
             )
+
+        elif provider == "gemini":
+            api_key = settings.get_llm_api_key()
+            if not api_key:
+                raise ValueError("Gemini API key is missing. Please set GEMINI_API_KEY in your .env file.")
             
-        elif provider == "ollama":
+            self._client = ChatGoogleGenerativeAI(
+                model="gemini-2.5-flash",
+                api_key=api_key,
+            )
+
+        elif provider == "llama":
             self._client = ChatOllama(
-                model="llama3.2",  # Consider moving this to settings in the future
+                model="llama3.2:3b",
                 temperature=0
             )
+        
+        elif provider == "openrouter":
+            api_key = settings.get_llm_api_key()
+            if not api_key:
+                raise ValueError("OpenRouter API key is missing. Please set OPENROUTER_API_KEY in your .env file.")
             
+            print(f"THE MODEL IS: {settings.llm_model}")
+            self._client = ChatOpenAI(
+                model=settings.llm_model,
+                api_key=api_key,
+                base_url="https://openrouter.ai/api/v1"
+            )
         else:
             raise ValueError(f"Unknown LLM provider: {provider}")
 

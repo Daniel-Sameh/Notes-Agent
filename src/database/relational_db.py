@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker, Session
 from datetime import datetime
 from typing import Generator, Optional, List
@@ -6,12 +6,23 @@ from .models import Base, Note, User
 from .utils import utc_now
 from ..config import settings
 
-DATABASE_URL = settings.db_url
+DATABASE_URL = settings.database_url
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# FIX (ISSUE 12): expire_on_commit=False prevents DetachedInstanceError on returned
+# ORM objects after the session closes. Without this, accessing any attribute on a
+# returned Note outside the session block raises DetachedInstanceError.
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+    expire_on_commit=False,
+)
+
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
@@ -20,7 +31,9 @@ def get_db() -> Generator[Session, None, None]:
     finally:
         db.close()
 
+
 # Notes CRUD Operations
+
 def create_note(user_id: str, title: str, body: str, tags: Optional[List[str]]) -> Note:
     with SessionLocal() as db:
         note = Note(user_id=user_id, title=title, body=body, tags=",".join(tags) if tags else "")
@@ -29,35 +42,52 @@ def create_note(user_id: str, title: str, body: str, tags: Optional[List[str]]) 
         db.refresh(note)
         return note
 
+
 def get_note_by_id(user_id: str, id: str) -> Optional[Note]:
     with SessionLocal() as db:
         return db.query(Note).filter(Note.id == id, Note.user_id == user_id).first()
 
-def search_notes(user_id: str, query: str = "", tags: Optional[List[str]] = None, date: Optional[datetime] = None, date_end: Optional[datetime] = None, limit: int = 10) -> List[Note]:
+
+def search_notes(
+    user_id: str,
+    query: str = "",
+    tags: Optional[List[str]] = None,
+    date: Optional[datetime] = None,
+    date_end: Optional[datetime] = None,
+    limit: int = 10,
+) -> List[Note]:
     with SessionLocal() as db:
         base_query = db.query(Note).filter(Note.user_id == user_id)
         notes = set()
-        
+
         if query:
             notes.update(base_query.filter(Note.body.contains(query)).all())
+
         if tags:
-            notes.update(base_query.filter(Note.tags.contains(",".join(tags))).all())
-        
-        # Date filtering
+            tag_filters = [Note.tags.contains(tag) for tag in tags]
+            notes.update(base_query.filter(or_(*tag_filters)).all())
+
         if date and date_end:
             notes.update(base_query.filter(Note.created_at >= date, Note.created_at < date_end).all())
         elif date:
             notes.update(base_query.filter(Note.created_at >= date).all())
         elif date_end:
             notes.update(base_query.filter(Note.created_at < date_end).all())
-            
-        # If no filters were provided, just return the latest notes for the user
+
         if not (query or tags or date or date_end):
-            notes.update(base_query.all())
-            
+            notes.update(
+                base_query.order_by(Note.updated_at.desc()).limit(limit).all()
+            )
+
         return list(notes)[:limit]
 
-def update_note(user_id: str, id: str, title: Optional[str], body: Optional[str], tags: Optional[List[str]]) -> Optional[Note]:
+def update_note(
+    user_id: str,
+    id: str,
+    title: Optional[str],
+    body: Optional[str],
+    tags: Optional[List[str]],
+) -> Optional[Note]:
     with SessionLocal() as db:
         note = db.query(Note).filter(Note.id == id, Note.user_id == user_id).first()
         if note:

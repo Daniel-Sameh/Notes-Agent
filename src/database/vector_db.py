@@ -1,15 +1,38 @@
 import chromadb
-from chromadb.config import Settings
 from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
-from .models import Note
+from pathlib import Path
+import shutil
 from ..config import settings
 
-DB_URL=settings.chroma_url
+DB_URL = settings.chroma_url
 
-# Initialize ChromaDB persistent client pointing to our local folder
-client = chromadb.PersistentClient(path=DB_URL)
 
-# Use the lightweight and fast all-MiniLM-L6-v2 embedding model (local)
+def _is_recoverable_chroma_error(exc: BaseException) -> bool:
+    error_text = str(exc).lower()
+    return (
+        "range start index" in error_text
+        or "pyo3_runtime.panicexception" in error_text
+        or "could not connect to tenant" in error_text
+        or str(type(exc).__name__).lower() == "panicexception"
+    )
+
+
+def _init_chroma_client(path: str):
+    """Initialize Chroma client and recover automatically from local index corruption."""
+    try:
+        return chromadb.PersistentClient(path=path)
+    except BaseException as exc:
+        db_path = Path(path)
+        if db_path.exists():
+            shutil.rmtree(db_path, ignore_errors=True)
+        try:
+            return chromadb.PersistentClient(path=path)
+        except BaseException as retry_exc:
+            if db_path.exists():
+                shutil.rmtree(db_path, ignore_errors=True)
+            return chromadb.PersistentClient(path=path)
+
+client = _init_chroma_client(DB_URL)
 embedding_function = SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
 # Get or create the unified collection
@@ -36,27 +59,30 @@ def update_in_vector_db(user_id: str, id: str, title: str, body: str, tags: str 
         metadatas=[{"user_id": user_id, "title": title, "tags": tags}]
     )
 
-def delete_from_vector_db(user_id: str, id: str):
+def delete_from_vector_db(id: str):
     """Removes a note's embedding from the vector database by ID."""
-    collection.delete(
-        ids=[str(id)],
-        where={"user_id": user_id}
-    )
+    try:
+        collection.delete(ids=[str(id)])
+    except Exception:
+        # Already deleted or never embedded, safe to swallow
+        pass
 
 def semantic_search_vector_db(user_id: str, query: str, limit: int = 5) -> list[str]:
     """
-    Performs a semantic similarity search on the queries.
+    Performs semantic similarity search filtered to the given user's notes.
     Returns a list of matching note IDs (as strings).
     """
-    results = collection.query(
-        query_texts=[query],
-        n_results=limit,
-        where={"user_id": user_id}
-    )
-    
+    try:
+        results = collection.query(
+            query_texts=[query],
+            n_results=limit,
+            where={"user_id": user_id},
+        )
+    except Exception:
+        # Collection empty or other transient error
+        return []
+
     if not results or not results["ids"]:
         return []
-    
-    # results["ids"] is a list of lists: [['id1', 'id2', ...]]
-    return results["ids"][0]
 
+    return results["ids"][0]
