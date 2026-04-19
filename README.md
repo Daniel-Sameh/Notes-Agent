@@ -49,11 +49,21 @@ DATABASE_URL=sqlite:///./notes.db
 CHROMA_URL=./chroma_data
 ```
 
+*(Note: When running via Docker Compose, `DATABASE_URL` and `CHROMA_URL` are automatically overridden to save into a local `./data` folder so your notes survive restarts).*
+
 ### 3. How to Run
 
-#### Run The Chat Agent
+#### Run with Docker
 
-Start the interactive conversational agent in your terminal:
+You can run the entire solution with a single command using Docker Compose. This builds the image and drops you into the interactive terminal, with your data securely persisted to the local `./data` folder.
+
+```bash
+docker-compose run --rm notes-agent
+```
+
+#### Run Locally (Without Docker)
+
+Start the interactive conversational agent in your local terminal:
 
 ```bash
 python -m src.main

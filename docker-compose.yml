@@ -1,0 +1,18 @@
+services:
+  notes-agent:
+    build: .
+    container_name: notes-agent
+    # To use interactive shell properly, keep stdin open and allocate pseudo-TTY
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+    environment:
+      # Use the mapped 'data/' volume for SQLite and ChromaDB persistence in Docker
+      - DATABASE_URL=sqlite:///./data/notes.db
+      - CHROMA_URL=./data/chroma_data
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Best practice for SQLite & ChromaDB: Map a local data directory 
+      # so your databases and vectors aren't destroyed when the container stops.
+      - ./data:/app/data
