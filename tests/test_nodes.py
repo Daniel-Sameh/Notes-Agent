@@ -118,8 +118,13 @@ class TestAgentNodes(unittest.TestCase):
         # Assert
         self.assertIn("not in your context memory", result["error"])
 
-    def test_guard_node_sets_pending_confirmation_for_destructive_tool(self):
+    @patch('src.agent.nodes.llm')
+    def test_guard_node_sets_pending_confirmation_for_destructive_tool(self, mock_llm):
         # Arrange
+        mock_model = MagicMock()
+        mock_llm.client = mock_model
+        mock_model.invoke.return_value = AIMessage(content="NO")
+
         tool_message = AIMessage(content="", tool_calls=[{"name": "delete_note", "args": {"id": "real-id"}, "id": "1"}])
         state = {
             "messages": [tool_message],
@@ -131,9 +136,29 @@ class TestAgentNodes(unittest.TestCase):
         result = guard_tool_call_node(state)
         
         # Assert
-        self.assertIn("ask the user to confirm", result["error"])
+        self.assertIn("MUST ask the user", result["error"])
         self.assertIsNotNone(result["pending_confirmation"])
         self.assertEqual(result["pending_confirmation"]["tool"], "delete_note")
+
+    @patch('src.agent.nodes.llm')
+    def test_guard_node_allows_destructive_tool_if_confirmed(self, mock_llm):
+        # Arrange
+        mock_model = MagicMock()
+        mock_llm.client = mock_model
+        mock_model.invoke.return_value = AIMessage(content="YES")
+
+        tool_message = AIMessage(content="", tool_calls=[{"name": "delete_note", "args": {"id": "real-id"}, "id": "1"}])
+        state = {
+            "messages": [AIMessage(content="Delete it"), tool_message],
+            "active_note_ids": ["real-id"],
+            "pending_confirmation": None
+        }
+        
+        # Act
+        result = guard_tool_call_node(state)
+        
+        # Assert
+        self.assertEqual(result.get("error", ""), "")
 
     # ---------------------------------------------------------
     # Tests for _retrieve_or_compact_history

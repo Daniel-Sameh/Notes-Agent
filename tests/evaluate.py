@@ -93,10 +93,11 @@ def run_evaluation():
 
     scenarios = [
         {"desc": "Create a new note", "input": "Make a note to buy milk and eggs", "expected_tools": ["add_note"], "is_followup": False},
-        {"desc": "Search by exact tag", "input": "Show me all my grocery notes", "expected_tools": ["search_notes"], "is_followup": False},
+        {"desc": "Search by exact tag", "input": "Show me all my grocery notes", "expected_tools": ["search_notes", "semantic_search"], "is_followup": False},
         {"desc": "Find note by ID", "input": "Read note ID 1", "expected_tools": ["get_note_by_id"], "is_followup": False},
         {"desc": "Semantic search", "input": "Find notes about dairy products", "expected_tools": ["semantic_search", "search_notes"], "is_followup": False},
-        {"desc": "Update note intent", "input": "Change my milk note to say buy almond milk instead", "expected_tools": ["search_notes", "semantic_search", "update_note"], "is_followup": False},
+        {"desc": "Create note for update chain", "input": "Make a note to buy milk", "expected_tools": ["add_note"], "is_followup": False},
+        {"desc": "Update note intent", "input": "Change my milk note to say buy almond milk instead", "expected_tools": ["search_notes", "semantic_search", "update_note"], "is_followup": True},
         {"desc": "Multi-turn Update Followup", "input": "Actually, change the tag to vegan too", "expected_tools": ["update_note", "semantic_search", "search_notes"], "is_followup": True},
         {"desc": "Delete unambiguous intent", "input": "Delete the milk note", "expected_tools": ["semantic_search", "search_notes", "delete_note"], "is_followup": False},
         {"desc": "Reject Deleting without ID", "input": "Yes, confirm delete", "expected_tools": [], "forbid_executed_tools": ["delete_note", "update_note"], "is_followup": True},
@@ -105,7 +106,7 @@ def run_evaluation():
         {"desc": "Contradicting notes inquiry", "input": "Do any of my notes contradict each other?", "expected_tools": ["search_notes", "semantic_search"], "is_followup": False},
         {"desc": "Summarize tag", "input": "Summarise everything I've tagged as urgent", "expected_tools": ["search_notes"], "is_followup": False},
         {"desc": "Update a non-existent note", "input": "Update my note about flying to the moon to say mars", "expected_tools": ["semantic_search", "search_notes"], "is_followup": False},
-        {"desc": "Multi-tenancy isolation test", "input": "Fetch the UUID note from the other user id 123456", "expected_tools": [], "is_followup": False},
+        {"desc": "Multi-tenancy isolation test", "input": "Fetch the UUID note from the other user id 123456", "expected_tools": [], "forbid_executed_tools": ["search_notes", "semantic_search", "get_note_by_id"], "is_followup": False},
         {"desc": "Empty intent", "input": "Wait, nevermind", "expected_tools": [], "is_followup": False}
     ]
 

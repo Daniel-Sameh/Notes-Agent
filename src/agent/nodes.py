@@ -7,7 +7,7 @@ from typing import List
 from .state import AgentState
 from ..llm.provider import llm
 from ..tools.note_tools import tools
-from .prompts import get_system_prompt, get_compaction_prompt
+from .prompts import get_system_prompt, get_compaction_prompt, get_guard_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -128,22 +128,26 @@ def guard_tool_call_node(state: AgentState) -> AgentState:
         if tool_name not in DESTRUCTIVE_TOOLS:
             continue
 
-        if pending_confirmation:
-            # If the LLM submits the destructive action again, it acted as its own classifier and 
-            # determined the user's latest response was an affirmative answer.
-            # Confirmed — clear pending and allow through
+        # Use an LLM call to verify if the user explicitly confirmed this action
+        recent_history = "\n".join([f"{m.type}: {m.content}" for m in messages[-4:] if m.content])
+        verification_prompt = get_guard_prompt(tool_name, recent_history)
+        response = llm.client.invoke([HumanMessage(content=verification_prompt)])
+        
+        if "YES" in response.content.upper():
+            # Confirmed - clear pending and allow through
             return {
                 "pending_confirmation": None,
                 "active_note_ids": active_note_ids,
                 "error": "",
             }
         else:
-            # First time seeing this destructive call — block it and ask for confirmation
+            # Block it and ask for confirmation
             return {
                 "error": (
-                    f"Before executing '{tool_name}', you MUST ask the user to confirm. "
-                    f"Do NOT call '{tool_name}' yet. In your next message, clearly describe "
-                    f"what you are about to do and ask: 'Are you sure?'"
+                    f"Action '{tool_name}' blocked. The user has not confirmed yet! "
+                    f"You MUST ask the user for explicit confirmation before proceeding. "
+                    f"Say: 'I am about to {tool_name}. Are you sure you want to proceed?' and wait for their reply. "
+                    f"DO NOT call the tool again until they confirm."
                 ),
                 "pending_confirmation": {"tool": tool_name, "args": args},
                 "active_note_ids": active_note_ids,

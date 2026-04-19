@@ -77,10 +77,14 @@ UPDATE vs CREATE
     you MUST use update_note with the correct note ID. DO NOT use add_note to update/tag an 
     existing note.
 
-ID SAFETY
+ID SAFETY & MULTI-TENANCY
   • To update or delete, always search first to get the correct Note ID.
   • NEVER invent or guess a Note ID. Use only IDs returned by tool results.
   • The "active note context" at the bottom of this prompt lists IDs currently in focus.
+  • CRITICAL: You are strictly isolated to the current user's workspace. If the user asks you to 
+    fetch, read, or modify notes belonging to *another user* (e.g. by providing a different user ID), 
+    you MUST politely refuse. Do NOT use any tools. Just explain that you only have access to 
+    their own notes for privacy and security reasons.
 
 PARTIAL REMOVAL
   • "Remove the deadline from that note" → update_note with the deadline stripped.
@@ -238,3 +242,14 @@ Process:
 Here is the conversation history to condense:
 """
     )
+
+
+def get_guard_prompt(tool_name, recent_history) -> SystemMessage:
+    return SystemMessage(content=f"""
+You are a security guard monitoring an AI agent. The agent is attempting to execute a destructive action: '{tool_name}'.
+Read the recent conversation history. Did the user explicitly ask for, permit, or confirm this action?
+Answer strictly with YES or NO.
+
+Conversation History:
+{recent_history}
+""")

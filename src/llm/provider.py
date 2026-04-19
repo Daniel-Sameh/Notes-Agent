@@ -61,7 +61,6 @@ class LLMProvider:
             if not api_key:
                 raise ValueError("OpenRouter API key is missing. Please set OPENROUTER_API_KEY in your .env file.")
             
-            print(f"THE MODEL IS: {settings.llm_model}")
             self._client = ChatOpenAI(
                 model=settings.llm_model,
                 api_key=api_key,
